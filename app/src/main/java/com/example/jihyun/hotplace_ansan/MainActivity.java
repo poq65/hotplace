@@ -65,6 +65,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private PlaceAdapter placeAdapter;
     private LinearLayoutManager mLayoutManager;
     private RecyclerView recyclerView;
+    private RecyclerView.Adapter mAdapter;
     static final LatLng SEOUL = new LatLng(37.56, 126.97);
     private GoogleMap googleMap;
     public Handler mHandler;
@@ -72,6 +73,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     Gps gps = null;
     ImageView addbtn;
 
+    private Realm realm;
+    private RealmQuery<ItemData> query;
+    private RealmResults<ItemData> results;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -80,16 +84,42 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         MapFragment mapFragment = (MapFragment) getFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
-
         recyclerView = (RecyclerView) findViewById(R.id.recyclerView);
         itemDatas = new ArrayList<ItemData>();
-        initModel();
+        //initModel();
+
+
+        Realm.init(this);
+        //configuration 설정
+        RealmConfiguration realmConfiguration = new RealmConfiguration.Builder().build();
+        Realm.setDefaultConfiguration(realmConfiguration);
+        realm=Realm.getDefaultInstance();
+        query = realm.where(ItemData.class);
+        results = query.findAll();
+        results = results.sort("id", Sort.DESCENDING); //내림차순으로 변경
+
+        //리스너추가 - 지켜 보고 있다.
+        results.addChangeListener(new RealmChangeListener<RealmResults<ItemData>>() {
+            @Override
+            public void onChange(RealmResults<ItemData> element) {
+                //회원목록을 갱신한다. 다른 방법은 없나?
+                //Toast.makeText(MainActivity.this, "목록을 갱신합니다.", Toast.LENGTH_SHORT).show();
+                mAdapter = new PlaceAdapter(results);
+                recyclerView.setAdapter(mAdapter);
+            }
+        });
 
         mLayoutManager = new LinearLayoutManager(MainActivity.this);
-        placeAdapter = new PlaceAdapter(itemDatas, getApplicationContext());
+        //placeAdapter = new PlaceAdapter(itemDatas, getApplicationContext());
+        recyclerView.setHasFixedSize(true);//옵션
         recyclerView.setAdapter(placeAdapter);
-        recyclerView.setLayoutManager(mLayoutManager);
+
         recyclerView.setItemAnimator(new DefaultItemAnimator());
+        mAdapter = new PlaceAdapter(results);
+        recyclerView.setAdapter(mAdapter);
+
+        mLayoutManager = new LinearLayoutManager(this);
+        recyclerView.setLayoutManager(mLayoutManager);
 
         mHandler = new Handler() {
             @Override
@@ -116,6 +146,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
 
     }
+
+
+
+
 
     private void getCurrentLocation() {
 //         create class object
@@ -202,6 +236,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
 
+
+
+
+    //모든 realm 인스턴스들을 닫아 준다. 메모리관리 중요
+    @Override
+    public void onDestroy(){
+        super.onDestroy();
+        //정리하기
+        realm.removeAllChangeListeners();
+        realm.close();
+    }
 
 
 

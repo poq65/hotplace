@@ -1,5 +1,6 @@
 package com.example.jihyun.hotplace_ansan;
 
+import android.app.Activity;
 import android.content.ClipData;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -21,6 +22,7 @@ import android.widget.ImageView;
 import android.widget.RatingBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 
 import java.io.File;
@@ -29,9 +31,12 @@ import java.util.ArrayList;
 import java.util.Date;
 
 import io.realm.Realm;
+import io.realm.RealmConfiguration;
+import io.realm.RealmResults;
 
 public class Rigister extends AppCompatActivity {
 
+    EditText edit_name,edit_text;
     RatingBar ratingBar;
     private Spinner spinnerType;
     ArrayList<String> items;
@@ -43,11 +48,21 @@ public class Rigister extends AppCompatActivity {
     private Uri mImageCaptureUri;
     private ImageView mPhotoImageView;
 
+    //db
+    private Realm realm;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_rigister);
 
+        Realm.init(this);
+        //configuration 설정
+        RealmConfiguration realmConfiguration = new RealmConfiguration.Builder().build();
+        Realm.setDefaultConfiguration(realmConfiguration);
+        realm=Realm.getDefaultInstance();
+
+        edit_name = (EditText) findViewById(R.id.editName);
+        edit_text=(EditText)findViewById(R.id.editText);
         items = new ArrayList<String>();
         items.add("한식");
         items.add("중식");
@@ -89,6 +104,17 @@ public class Rigister extends AppCompatActivity {
         save.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if(edit_name.getText().toString().equals("")) {
+                    Toast.makeText(Rigister.this, "필수입력 항목이 비어 있음", Toast.LENGTH_SHORT).show();
+                    return;
+                } else {
+                    insertDatabase();
+
+                    //돌려보내자.
+                    Intent intent = new Intent();
+                    setResult(Activity.RESULT_OK, intent);
+                    finish();
+                }
 
             }
         });
@@ -234,9 +260,35 @@ public class Rigister extends AppCompatActivity {
         }
     }
 
+    //입력
+    private void insertDatabase() {
+        //방법2 : 자동으로 begin/commit를 관리하는 방법, 에러가 발생시 자동 캔슬된다.
+        realm.executeTransaction(new Realm.Transaction(){
 
+            @Override
+            public void execute(Realm realm) {
+                //increment index
+                //DB에서 id최대값을 가져와서 1을 더해서 입력할 id값으로 넣는다.
+                Number num = realm.where(ItemData.class).max("id");
+                int nextID;
+                if (num == null) {
+                    nextID = 1;
+                } else {
+                    nextID = num.intValue() + 1;
+                }
+                ItemData member = realm.createObject(ItemData.class, nextID);//primarykey 지정한 경우
+                member.setTitle(edit_name.getText().toString());
+                member.setDescription(edit_text.getText().toString());
+            }
+        });
+    }
 
-
+    //모든 realm 인스턴스들을 닫아 준다. 중요
+    @Override
+    public void onDestroy(){
+        super.onDestroy();
+        realm.close();
+    }
 
 
 }
